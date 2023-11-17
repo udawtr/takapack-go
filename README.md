@@ -17,20 +17,20 @@ http://takashiijiri.com/study/miscs/takapack.html より、
 
 ```
 /*----------------------------
-    2  3  0  0  0        8
-    3  0  4  0  6       45
+      2  3  0  0  0        8
+      3  0  4  0  6       45
 A =   0 -1 -3  2  0    b =-3
-    0  0  1  0  0        3
-    0  4  2  0  1       19
+      0  0  1  0  0        3
+      0  4  2  0  1       19
 ----------------------------*/
 
     //(umfpackは complessed columnだけど、実装の都合上 Compressed Rowを採用 ())
     // umfpackと併用するときは umfpack_solve の第一引数に UMFPACK_At を食わせて転置すればOK
     //compressed row form of A 
 	N := 5
-	Ap := []int{0, 2, 5, 8, 9, 12}
-	Ai := []int{0, 1, 0, 2, 4, 1, 2, 3, 2, 1, 2, 4}
-	Ax := []float64{2.0, 3.0, 3, 4, 6, -1, -3, 2, 1, 4, 2, 1}
+	Ax := []float64{2, 3, 3, 4, 6, -1, -3, 2, 1, 4, 2, 1} // V
+	Ai := []int    {0, 1, 0, 2, 4,  1,  2, 3, 2, 1, 2, 4} // COL_INDEX
+	Ap := []int    {0,    2,        5,        8, 9,      12}  // ROW_INDEX
     b := []float64{8, 45, -3, 3, 19}
 ```
 

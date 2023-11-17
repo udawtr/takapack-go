@@ -3,10 +3,23 @@ package takapack
 import (
 	"fmt"
 	"math"
+
+	"github.com/james-bowman/sparse"
 )
 
 // takapackCGSparseSolve solves a sparse linear system using the Conjugate Gradient method
-func CGSparseSolve(N int, Ap, Ai []int, Ax, b []float64, threshold float64) []float64 {
+func CGSparseSolve(mat *sparse.CSR, b []float64, threshold float64) []float64 {
+	rawMat := mat.RawMatrix()
+	r, c := rawMat.I, rawMat.J
+	Ap := rawMat.Indptr
+	Ai := rawMat.Ind
+	Ax := rawMat.Data
+
+	if r != c {
+		panic("r != c")
+	}
+	N := r
+
 	result := make([]float64, N)
 	cgR := make([]float64, N)
 	cgD := make([]float64, N)
@@ -83,21 +96,32 @@ func CGSparseSolve(N int, Ap, Ai []int, Ax, b []float64, threshold float64) []fl
 	return result
 }
 
-// Pair is a utility structure to hold a pair of values
-type Pair struct {
+// pair is a utility structure to hold a pair of values
+type pair struct {
 	first  int
 	second float64
 }
 
-func LUFactorization(N int, Ap, Ai []int, Ax []float64) (LUp, LUi []int, LUx []float64, LUrowFlip []int) {
+func LUFactorization(mat *sparse.CSR) *SparseLU {
+	rawMat := mat.RawMatrix()
+	r, c := rawMat.I, rawMat.J
+	Ap := rawMat.Indptr
+	Ai := rawMat.Ind
+	Ax := rawMat.Data
+
+	if r != c {
+		panic("r != c")
+	}
+	N := r
+
 	//compressed row form用の LU分解
-	LUrowFlip = make([]int, N)
+	LUrowFlip := make([]int, N)
 	for i := range LUrowFlip {
 		LUrowFlip[i] = i
 	}
 
 	nonZeroEntryNum := 0
-	Row := make([][]Pair, N)
+	Row := make([][]pair, N)
 	MyiTmp := make([]float64, N)
 	Myi := make([]float64, N)
 
@@ -164,15 +188,15 @@ func LUFactorization(N int, Ap, Ai []int, Ax []float64) (LUp, LUi []int, LUx []f
 		for y := 0; y < N; y++ {
 			if Myi[y] != 0.0 {
 				nonZeroEntryNum++
-				Row[y] = append(Row[y], Pair{I, Myi[y]})
+				Row[y] = append(Row[y], pair{I, Myi[y]})
 			}
 		}
 	}
 
 	//最後に Row を Compressed row formにまとめる
-	LUp = make([]int, N+1)
-	LUx = make([]float64, nonZeroEntryNum)
-	LUi = make([]int, nonZeroEntryNum)
+	LUp := make([]int, N+1)
+	LUx := make([]float64, nonZeroEntryNum)
+	LUi := make([]int, nonZeroEntryNum)
 
 	index := 0
 	for i := 0; i < N; i++ {
@@ -185,16 +209,26 @@ func LUFactorization(N int, Ap, Ai []int, Ax []float64) (LUp, LUi []int, LUx []f
 	}
 	LUp[N] = index
 
-	return LUp, LUi, LUx, LUrowFlip
+	return &SparseLU{
+		N:         N,
+		LUp:       LUp,
+		LUi:       LUi,
+		LUx:       LUx,
+		LUrowFlip: LUrowFlip,
+	}
 }
 
 // takapackTraceMat prints the contents of a sparse matrix
-func TraceMat(N int, Ap, Ai []int, Ax []float64) {
-	fmt.Println("\ntakapack_tracemat")
+func TraceMat(mat *sparse.CSR) {
+	rawMat := mat.RawMatrix()
+	r, c := rawMat.I, rawMat.J
+	Ap := rawMat.Indptr
+	Ai := rawMat.Ind
+	Ax := rawMat.Data
 
-	for y := 0; y < N; y++ {
+	for y := 0; y < r; y++ {
 		idx := Ap[y]
-		for x := 0; x < N; x++ {
+		for x := 0; x < c; x++ {
 			if idx < Ap[y+1] && x == Ai[idx] {
 				fmt.Printf("%.4f  ", Ax[idx])
 				idx++
@@ -206,7 +240,20 @@ func TraceMat(N int, Ap, Ai []int, Ax []float64) {
 	}
 }
 
-func LUSolve(N int, LUp, LUi []int, LUx []float64, LUrowFlip []int, b []float64) []float64 {
+type SparseLU struct {
+	N         int
+	LUp, LUi  []int
+	LUx       []float64
+	LUrowFlip []int
+}
+
+func LUSolve(mat *SparseLU, b []float64) []float64 {
+	N := mat.N
+	LUrowFlip := mat.LUrowFlip
+	LUp := mat.LUp
+	LUi := mat.LUi
+	LUx := mat.LUx
+
 	// Initialize flipped B and Y
 	flippedB := make([]float64, N)
 	flippedY := make([]float64, N)
