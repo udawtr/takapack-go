@@ -1,64 +1,82 @@
-# takapack(go)
+# Takapack - Sparse Matrix Solver
 
-http://takashiijiri.com/study/miscs/takapack.html より、
+## Overview
 
-　
-- 疎な連立方程式を解く
-  -  与える行列は, umfpackと同様の comressed row form (umfpackではcompressed column formだった)
-  - CG法による　　連立方程式 Ax = b の 求解をサポート
-  - LU分解による 連立方程式 Ax = b の 求解をサポート
-　　
-- NYSL（Version 0.9982）ライセンスなので、好きに使ってください（大学のレポートとかの参考になれば良いなと思っています.）．
+Implementation of sparse LU decomposition and CG method (conjugate gradient method).
+Original source code was written by (Takashi Ijiri)[http://takashiijiri.com/study/miscs/takapack.html]
 
-## 使い方
-　
-### 1) 解きたい連立方程式 Ax = b の行列Aをcompressed row formで作る。
-　　　　配列bもつくる。
+## Features
 
-```
-/*----------------------------
-      2  3  0  0  0        8
-      3  0  4  0  6       45
-A =   0 -1 -3  2  0    b =-3
-      0  0  1  0  0        3
-      0  4  2  0  1       19
-----------------------------*/
+* Compatible with [Sparse matrix formats module](https://pkg.go.dev/github.com/james-bowman/sparse)'s CSR struct (Compressed Sparse Row).
+* Solve Ax=b with LU decomposition
+* Solve Ax=b with CG method
 
-    //(umfpackは complessed columnだけど、実装の都合上 Compressed Rowを採用 ())
-    // umfpackと併用するときは umfpack_solve の第一引数に UMFPACK_At を食わせて転置すればOK
-    //compressed row form of A 
-	N := 5
-	Ax := []float64{2, 3, 3, 4, 6, -1, -3, 2, 1, 4, 2, 1} // V
-	Ai := []int    {0, 1, 0, 2, 4,  1,  2, 3, 2, 1, 2, 4} // COL_INDEX
-	Ap := []int    {0,    2,        5,        8, 9,      12}  // ROW_INDEX
-    b := []float64{8, 45, -3, 3, 19}
-```
+## Usage
 
-### 2) CG法で解くなら CG法の関数を呼ぶ
+Tha CSR struct of james-bowman's sparse module is compatible with this package. First create DOK or other fomart matrix and convert to CSR format.
+Second just Call takapack's function. Just it.
+
 
 ```
-    x := CGSparseSolve(N, Ap, Ai, Ax, b, 0.00000001);
-    fmt.Println("Solution:", x)
+// Construct a new 5x5 DOK (Dictionary Of Keys) matrix
+mat_dok := sparse.NewDOK(5, 5)
+
+// Populate it with some non-zero values
+//       2  3  0  0  0        8
+//       3  0  4  0  6       45
+// A =   0 -1 -3  2  0    b =-3
+//       0  0  1  0  0        3
+//       0  4  2  0  1       19
+mat_dok.Set(0, 0, 2)
+mat_dok.Set(0, 1, 3)
+mat_dok.Set(1, 0, 3)
+mat_dok.Set(1, 2, 4)
+mat_dok.Set(1, 4, 6)
+mat_dok.Set(2, 1, -1)
+mat_dok.Set(2, 2, -3)
+mat_dok.Set(2, 3, 2)
+mat_dok.Set(3, 2, 1)
+mat_dok.Set(4, 1, 4)
+mat_dok.Set(4, 2, 2)
+mat_dok.Set(4, 4, 1)
+
+// Convert to CSR format
+mat_csr := mat_dok.ToCSR()
+
+// Show A
+takapack.TraceMat(mat_csr)
+
+// Solve Ax=b
+b := []float64{8, 45, -3, 3, 19}
+lu := takapack.LUFactorization(mat_csr)
+x := LUSolve(lu, b)
+fmt.Println("Solution:", x)
+
+// If you want to use CG
+// threshold := 0.00000001
+// x := takapack.CGSparseSolve(mat_csr, b, threshold)
 ```
 
-### 3)LU分解で解くなら i)LU分解関数 ii)解く関数 iii)解放する関数 を順に呼ぶ
+## Installation
+
+With Go installed, package installation is performed using go get.
 
 ```
-	LUp, LUi, LUx, LU_rowflip := LUFactorization(N, Ap, Ai, Ax)
-    x := LUSolve(N, LUp, LUi, LUx, LU_rowflip, b)
-    fmt.Println("Solution:", x)
-``` 
-
-## 雑な動作確認方法
-
+go get -u github.com/udawtr/takapack-go/takapack
 ```
-$ go run main.go
 
-takapack_tracemat
-2.0000  3.0000  *.****  *.****  *.****  
-3.0000  *.****  4.0000  *.****  6.0000  
-*.****  -1.0000  -3.0000  2.0000  *.****  
-*.****  *.****  1.0000  *.****  *.****  
-*.****  4.0000  2.0000  *.****  1.0000  
-Solution: [-5.293829947609467 1.2166710160167535 -3.3297217218117185 5.597773881583578 16.722980224896652]
-```
+## Acknowledgements
+
+- [takapack(original)](http://takashiijiri.com/study/miscs/takapack.html)
+- Barrett, Richard et al. (1994). Section 2.3.1 Conjugate Gradient Method (CG). In Templates for the Solution of Linear Systems: Building Blocks for Iterative Methods (2nd ed.) (pp. 12-15). Philadelphia, PA: SIAM. Retrieved from http://www.netlib.org/templates/templates.pdf
+- Hestenes, M., and Stiefel, E. (1952). Methods of conjugate gradients for solving linear systems. Journal of Research of the National Bureau of Standards, 49(6), 409. doi:10.6028/jres.049.044
+- Málek, J. and Strakoš, Z. (2015). Preconditioning and the Conjugate Gradient Method in the Context of Solving PDEs. Philadelphia, PA: SIAM.
+
+## See Also
+
+* [james-bowman/sparse](https://pkg.go.dev/github.com/james-bowman/sparse)
+
+
+## License
+
+MIT
